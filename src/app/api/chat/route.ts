@@ -13,16 +13,28 @@ const chatModel = new ChatOpenAI({
 // In-memory storage for user conversations
 const userChats: Record<string, (AIMessage | HumanMessage)[]> = {};
 
-// Create the chat prompt template
-const chatPrompt = ChatPromptTemplate.fromMessages([
-  ["system", getSystemPrompt()],
-  new MessagesPlaceholder("history"),
-  ["human", "{input}"]
-]);
+
 
 // System prompt function
-function getSystemPrompt(): string {
+function getSystemPrompt(languageCode: string): string {
+  const languageMap: Record<string, string> = {
+    'hi-IN': 'Hindi (हिंदी)',
+    'kn-IN': 'Kannada (ಕನ್ನಡ)',
+    'te-IN': 'Telugu (తెలుగు)',
+    'ta-IN': 'Tamil (தமிழ்)',
+    'mr-IN': 'Marathi (मराठी)',
+    'ml-IN': 'Malayalam (മലയാളം)',
+    'gu-IN': 'Gujarati (ગુજરાતી)',
+    'en-IN': 'English',
+    'pa-IN': 'Punjabi (ਪੰਜਾਬੀ)',
+    'ur-IN': 'Urdu (اردو)'
+  };
+
+  const targetLanguage = languageMap[languageCode] || 'English';
+
   return `You are a friendly and knowledgeable loan advisor. Structure the conversation efficiently:
+
+  IMPORTANT: You MUST respond in ${targetLanguage}. Even if the user speaks English, if the target language is ${targetLanguage}, you must respond in ${targetLanguage}.
 
   PHASE 1: QUICK PERSONAL INFORMATION (KEEP THIS VERY BRIEF)
   - Only collect the user's name, age, and profession
@@ -60,7 +72,7 @@ function getSystemPrompt(): string {
   - When moving from Phase 2 to Phase 3, indicate that you'll now help determine suitable loan options
   - Always reference previously collected information when making recommendations
   - Maintain friendly but professional tone
-  - Always respond in the user's preferred language`;
+  - CRITICAL: Your ENTIRE response must be in ${targetLanguage}. Do not mix languages unless necessary for technical terms.`;
 }
 
 // Get conversation history
@@ -84,7 +96,7 @@ function updateConversation(userId: string, message: string, response: string): 
 export async function POST(request: Request) {
   try {
     const { userId, message, languageCode } = await request.json();
-    
+
     if (!message || !languageCode || !userId) {
       return NextResponse.json(
         { error: 'User ID, message, and language code are required' },
@@ -94,23 +106,29 @@ export async function POST(request: Request) {
 
     // Get conversation history
     const history = getConversationHistory(userId);
-    
+
+    // Create the chat prompt template dynamically based on language
+    const chatPrompt = ChatPromptTemplate.fromMessages([
+      ["system", getSystemPrompt(languageCode)],
+      new MessagesPlaceholder("history"),
+      ["human", "{input}"]
+    ]);
+
     // Create the chat chain
     const chain = chatPrompt.pipe(chatModel);
-    
+
     // Invoke the chain with the message and history
     const response = await chain.invoke({
       history,
-      input: message,
-      language: languageCode
+      input: message
     });
 
     const responseText = response.content.toString().trim();
-    
+
     // Update conversation history
     updateConversation(userId, message, responseText);
 
-    return NextResponse.json({ 
+    return NextResponse.json({
       response: responseText,
       languageCode
     });

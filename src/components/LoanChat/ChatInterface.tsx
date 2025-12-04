@@ -5,7 +5,7 @@ import { sendChatMessage } from '@/utils/loanChat';
 import { generateTTS } from '@/utils/tts';
 import { LANGUAGES } from '@/components/LoanGuide/data';
 import { transcribeAudio } from '@/utils/stt';
-import { Mic, Headphones, MessageCircle, ChevronDown, ArrowRight, GitBranch, GitCommit, GitPullRequest, LayoutGrid, PieChart, BarChart, List, Box, ChevronLeft, CheckCircle2 } from 'lucide-react';
+import { Mic, Square, Volume2, Globe, FileText, Download, Play, Pause, RotateCcw, X, MessageCircle, List, ChevronDown, Headphones, ArrowRight, Box, BarChart, CheckCircle2, ChevronLeft, LayoutGrid, PieChart } from 'lucide-react';
 
 // Define and export the Message type
 export type Message = {
@@ -565,7 +565,7 @@ export default function ChatInterface() {
   );
 
   return (
-    <div className="flex flex-col h-screen bg-white relative">
+    <div className="flex flex-col h-full bg-white relative overflow-hidden">
       {/* Summary Panel */}
       <div className={`fixed inset-0 bg-black bg-opacity-50 transition-opacity duration-300 ${isSummaryOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'
         }`}>
@@ -573,7 +573,7 @@ export default function ChatInterface() {
       </div>
 
       {/* Chat Interface */}
-      <div className="flex-1 flex flex-col">
+      <div className="flex-1 flex flex-col overflow-hidden">
         {/* Language Selection */}
         {!selectedLanguage ? (
           <div className="flex flex-col items-center justify-center h-full p-6">
@@ -597,100 +597,95 @@ export default function ChatInterface() {
             {/* <LoanProgressStepper currentStage={currentStage} /> */}
 
             {/* Chat Messages */}
-            <div className="flex-1 overflow-y-auto p-4 bg-gray-50">
+            <div className="flex-1 overflow-y-auto p-4 bg-gray-50 min-h-0">
               {messages.map((msg, index) => (
                 <ChatMessage key={index} message={msg} />
               ))}
               <div ref={messagesEndRef} />
             </div>
 
-            {/* Status Bar */}
-            <div className="p-4 border-t border-gray-200 bg-white">
-              <div className="h-10 flex items-center justify-center text-sm text-gray-500">
+            {/* Combined Input Area */}
+            <div className="border-t border-gray-200 bg-white">
+              {/* Status Indicator (Small) */}
+              <div className="px-4 py-1 bg-gray-50 flex items-center justify-center text-xs text-gray-500 border-b border-gray-100">
                 {isProcessing ? (
                   <div className="flex items-center gap-2">
-                    <Headphones className="w-4 h-4 text-blue-500 animate-pulse" />
-                    <span>Processing your request...</span>
+                    <Headphones className="w-3 h-3 text-blue-500 animate-pulse" />
+                    <span>Processing...</span>
                   </div>
                 ) : isRecording ? (
                   <div className="flex items-center gap-2">
-                    <Mic className="w-4 h-4 text-blue-500 animate-bounce" />
-                    <span>Listening...</span>
+                    <Mic className="w-3 h-3 text-red-500 animate-bounce" />
+                    <span className="text-red-500 font-medium">Listening...</span>
                   </div>
                 ) : (
                   <div className="flex items-center gap-2">
-                    <ChevronDown className="w-4 h-4 text-blue-500" />
-                    <span>Ready to assist</span>
+                    <div className="w-2 h-2 rounded-full bg-green-500"></div>
+                    <span>Online</span>
                   </div>
                 )}
               </div>
-            </div>
 
+              {/* Input Controls */}
+              <div className="p-4">
+                <div className="flex items-center gap-3">
+                  <input
+                    type="text"
+                    placeholder="Type your message..."
+                    className="flex-1 px-4 py-3 bg-gray-50 border border-gray-200 rounded-full focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all"
+                    onKeyPress={(e) => {
+                      if (e.key === 'Enter' && e.currentTarget.value.trim()) {
+                        const message = e.currentTarget.value.trim();
+                        e.currentTarget.value = '';
+                        setMessages(prev => [...prev, { text: message, sender: 'user' }]);
+                        processUserMessage(message);
+                      }
+                    }}
+                    disabled={isProcessing || !selectedLanguage}
+                  />
 
-            {/* Text Input Section */}
-            <div className="p-4 border-t border-gray-200 bg-white">
-              <div className="flex items-center gap-3">
-                {/* Text Input */}
-                <input
-                  type="text"
-                  placeholder="Type your message here..."
-                  className="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  onKeyPress={(e) => {
-                    if (e.key === 'Enter' && e.currentTarget.value.trim()) {
-                      const message = e.currentTarget.value.trim();
-                      e.currentTarget.value = '';
-                      setMessages(prev => [...prev, { text: message, sender: 'user' }]);
-                      processUserMessage(message);
-                    }
-                  }}
-                  disabled={isProcessing || !selectedLanguage}
-                />
+                  <button
+                    onClick={(e) => {
+                      const input = e.currentTarget.previousElementSibling as HTMLInputElement;
+                      if (input.value.trim()) {
+                        const message = input.value.trim();
+                        input.value = '';
+                        setMessages(prev => [...prev, { text: message, sender: 'user' }]);
+                        processUserMessage(message);
+                      }
+                    }}
+                    disabled={isProcessing || !selectedLanguage}
+                    className="p-3 bg-blue-600 text-white rounded-full hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-md hover:shadow-lg"
+                  >
+                    <ArrowRight className="w-5 h-5" />
+                  </button>
 
-                {/* Send Button */}
-                <button
-                  onClick={(e) => {
-                    const input = e.currentTarget.previousElementSibling as HTMLInputElement;
-                    if (input.value.trim()) {
-                      const message = input.value.trim();
-                      input.value = '';
-                      setMessages(prev => [...prev, { text: message, sender: 'user' }]);
-                      processUserMessage(message);
-                    }
-                  }}
-                  disabled={isProcessing || !selectedLanguage}
-                  className="px-6 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-                >
-                  <MessageCircle className="w-5 h-5" />
-                  <span>Send</span>
-                </button>
+                  <button
+                    onClick={() => {
+                      if (!isRecording) {
+                        startRecording();
+                      } else if (mediaRecorderRef.current?.state === 'recording') {
+                        mediaRecorderRef.current.stop();
+                      }
+                    }}
+                    disabled={isProcessing || !selectedLanguage}
+                    className={`p-3 rounded-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-sm border ${isRecording
+                      ? 'bg-red-50 border-red-200 text-red-500 hover:bg-red-100'
+                      : 'bg-white border-gray-200 text-gray-500 hover:bg-gray-50'
+                      }`}
+                  >
+                    <Mic className="w-5 h-5" />
+                  </button>
 
-                {/* Mic Button (Optional) */}
-                <button
-                  onClick={() => {
-                    if (!isRecording) {
-                      startRecording();
-                    } else if (mediaRecorderRef.current?.state === 'recording') {
-                      mediaRecorderRef.current.stop();
-                    }
-                  }}
-                  disabled={isProcessing || !selectedLanguage}
-                  className={`px-4 py-3 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${isRecording
-                    ? 'bg-red-500 text-white hover:bg-red-600'
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                    }`}
-                >
-                  <Mic className="w-5 h-5" />
-                </button>
-
-                {/* Summary Button */}
-                <button
-                  onClick={generateSummary}
-                  disabled={isProcessing || messages.length === 0}
-                  className="px-4 py-3 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                  title="Summarize Chat"
-                >
-                  <List className="w-5 h-5" />
-                </button>
+                  <button
+                    onClick={generateSummary}
+                    disabled={isProcessing || messages.length === 0}
+                    className="p-3 bg-white border border-gray-200 text-gray-500 rounded-full hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
+                    title="Summarize Chat"
+                  >
+                    <List className="w-5 h-5" />
+                  </button>
+                </div>
               </div>
             </div>
           </>

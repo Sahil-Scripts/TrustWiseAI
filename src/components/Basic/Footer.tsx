@@ -4,8 +4,16 @@ import React from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { motion } from 'framer-motion';
+import { usePathname } from 'next/navigation';
 
 const Footer: React.FC = () => {
+    const pathname = usePathname();
+
+    // Hide footer on chat page
+    if (pathname === '/loan-chat') {
+        return null;
+    }
+
     return (
         <footer className="relative bg-gradient-to-r from-blue-900 via-indigo-900 to-blue-900 text-white pt-20 pb-10 overflow-hidden">
             {/* Animated background elements */}
