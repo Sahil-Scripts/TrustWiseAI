@@ -8,7 +8,7 @@ import { sendChatMessage } from '@/utils/financialLiteracy';
 import { generateTTS } from '@/utils/tts';
 import { LANGUAGES } from '@/components/LoanGuide/data';
 import { transcribeAudio } from '@/utils/stt';
-import { Mic, Headphones, MessageCircle, ChevronDown, ArrowRight, DollarSign, PieChart, BarChart, ChevronLeft, Settings, Moon, Sun } from 'lucide-react';
+import { Mic, Headphones, MessageCircle, ChevronDown, ArrowRight, DollarSign, PieChart, BarChart, ChevronLeft, Settings, Moon, Sun, Send } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
 // Define supported language codes
@@ -54,6 +54,22 @@ export default function ChatInterface() {
   const [shouldRedirect, setShouldRedirect] = useState(false);
   const redirectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const [redirectCountdown, setRedirectCountdown] = useState(0);
+  const [inputText, setInputText] = useState('');
+
+  const handleSendMessage = async () => {
+    if (!inputText.trim() || isProcessing) return;
+
+    // Stop recording if active
+    if (isRecording && mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
+      mediaRecorderRef.current.stop();
+      setIsRecording(false);
+    }
+
+    const message = inputText.trim();
+    setInputText('');
+    setMessages(prev => [...prev, { text: message, sender: 'user' }]);
+    await processUserMessage(message);
+  };
 
   // Initialize audio context and analyser
   const initAudioContext = () => {
@@ -80,10 +96,13 @@ export default function ChatInterface() {
       const greeting = GREETINGS[selectedLanguage as LanguageCode] || GREETINGS['en-IN'];
       setMessages(prev => [...prev, { text: greeting, sender: 'bot' }]);
       await generateTTS(selectedLanguage!, greeting);
-      
-      setTimeout(() => {
-        startRecording();
-      }, 2000);
+
+      await generateTTS(selectedLanguage!, greeting);
+
+      // Removed auto-start recording to allow user choice
+      // setTimeout(() => {
+      //   startRecording();
+      // }, 2000);
     } catch (error) {
       console.error('Error starting conversation:', error);
     } finally {
@@ -93,7 +112,7 @@ export default function ChatInterface() {
 
   const startRecording = async () => {
     if (isTTSPlaying || isRecording) return;
-    
+
     try {
       initAudioContext();
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -157,7 +176,7 @@ export default function ChatInterface() {
     try {
       setIsProcessing(true);
       const sttResponse = await transcribeAudio(audioBlob, selectedLanguage!);
-      
+
       if (sttResponse?.transcript) {
         const userMessage = sttResponse.transcript.trim();
         setMessages(prev => [...prev, { text: userMessage, sender: 'user' }]);
@@ -175,11 +194,11 @@ export default function ChatInterface() {
   const playTTS = async (languageCode: string, text: string) => {
     try {
       setIsTTSPlaying(true);
-      
+
       const sentences = text.match(/[^.!?]+[.!?]*/g) || [text];
       const chunks = [];
       let currentChunk = '';
-      
+
       for (const sentence of sentences) {
         if ((currentChunk + sentence).length <= 200) {
           currentChunk += sentence;
@@ -209,7 +228,7 @@ export default function ChatInterface() {
         const data = await response.json();
         if (data.audios && data.audios.length > 0) {
           const audio = new Audio(`data:audio/wav;base64,${data.audios[0]}`);
-          
+
           if (mediaRecorderRef.current?.state === 'recording') {
             mediaRecorderRef.current.stop();
           }
@@ -225,20 +244,20 @@ export default function ChatInterface() {
     } finally {
       setIsTTSPlaying(false);
       if (!isRecording) {
-        setTimeout(() => {
-          startRecording();
-        }, 1000);
+        // setTimeout(() => {
+        //   startRecording();
+        // }, 1000);
       }
     }
   };
 
   const calculateRecordingDuration = (response: string) => {
     const wordCount = response.split(' ').length;
-    
+
     const baseDuration = 5000;
     const perWordDuration = 200;
     const maxDuration = 30000;
-    
+
     const calculatedDuration = baseDuration + (wordCount * perWordDuration);
     return Math.min(calculatedDuration, maxDuration);
   };
@@ -246,10 +265,10 @@ export default function ChatInterface() {
   // Check for redirect phrase in bot messages
   useEffect(() => {
     const lastMessage = messages[messages.length - 1];
-    if (lastMessage?.sender === 'bot' && 
-        (lastMessage.text.includes('financial-literacy') || 
-         lastMessage.text.toLowerCase().includes('financial literacy page'))) {
-      
+    if (lastMessage?.sender === 'bot' &&
+      (lastMessage.text.includes('financial-literacy') ||
+        lastMessage.text.toLowerCase().includes('financial literacy page'))) {
+
       // Set redirect flag and start countdown
       setShouldRedirect(true);
       setRedirectCountdown(5);
@@ -280,35 +299,35 @@ export default function ChatInterface() {
   const processUserMessage = async (message: string) => {
     try {
       console.log('Processing user message:', message);
-      
+
       const response = await sendChatMessage(userId, message, selectedLanguage!);
       console.log('Received response:', response);
-      
+
       setMessages(prev => [...prev, { text: response, sender: 'bot' }]);
-      
+
       // Calculate new recording duration based on response length
       const newDuration = calculateRecordingDuration(response);
       setRecordingDuration(newDuration);
-      
+
       // Check if response contains redirect phrase
-      if (response.includes('/financial-literacy') || 
-          response.toLowerCase().includes('financial literacy page')) {
+      if (response.includes('/financial-literacy') ||
+        response.toLowerCase().includes('financial literacy page')) {
         setShouldRedirect(true);
         setRedirectCountdown(5);
       }
-      
+
       await playTTS(selectedLanguage!, response);
     } catch (error) {
       console.error('Error processing message:', error);
       const errorMessage = "I'm sorry, I encountered an error. Please try again.";
       setMessages(prev => [...prev, { text: errorMessage, sender: 'bot' }]);
-      
-      // Start recording again after error
-      setTimeout(() => {
-        if (!isRecording) {
-          startRecording();
-        }
-      }, 2000);
+
+      // Start recording again after error - REMOVED
+      // setTimeout(() => {
+      //   if (!isRecording) {
+      //     startRecording();
+      //   }
+      // }, 2000);
     }
   };
 
@@ -357,10 +376,10 @@ export default function ChatInterface() {
   const generateVisualization = async () => {
     try {
       setIsVisualizing(true);
-      
+
       // Cycle through animations
       setAnimationIndex((animationIndex + 1) % animations.length);
-      
+
       const mockVisualizationData = {
         summary: "Based on our conversation, you're interested in improving your financial literacy and getting personalized financial advice.",
         flowChart: {
@@ -373,17 +392,17 @@ export default function ChatInterface() {
         },
         blockDiagram: {
           sections: [
-            { 
-              title: "Budgeting", 
-              content: ["Track expenses", "Create monthly budget", "Reduce unnecessary spending"] 
+            {
+              title: "Budgeting",
+              content: ["Track expenses", "Create monthly budget", "Reduce unnecessary spending"]
             },
-            { 
-              title: "Saving", 
-              content: ["Emergency fund", "Automatic transfers", "High-yield accounts"] 
+            {
+              title: "Saving",
+              content: ["Emergency fund", "Automatic transfers", "High-yield accounts"]
             },
-            { 
-              title: "Investing", 
-              content: ["Retirement accounts", "Index funds", "Asset allocation"] 
+            {
+              title: "Investing",
+              content: ["Retirement accounts", "Index funds", "Asset allocation"]
             }
           ]
         },
@@ -402,7 +421,7 @@ export default function ChatInterface() {
           }
         ]
       };
-      
+
       setVisualizationData(mockVisualizationData);
     } catch (error) {
       console.error('Error generating visualization:', error);
@@ -416,7 +435,7 @@ export default function ChatInterface() {
       setIsSummarizing(true);
       setSummaryData(null);
       setIsSummaryOpen(true);
-      
+
       const mockSummaryData = {
         summary: "Based on our conversation, you're looking to improve your financial situation with a focus on budgeting, saving, and investing for the future.",
         keyPoints: [
@@ -427,7 +446,7 @@ export default function ChatInterface() {
           "Review and adjust your budget monthly"
         ]
       };
-      
+
       setSummaryData(mockSummaryData);
     } catch (error) {
       console.error('Error generating summary:', error);
@@ -451,15 +470,14 @@ export default function ChatInterface() {
           <h3 className={`text-lg font-semibold ${darkMode ? 'text-gray-200' : 'text-gray-800'} mb-4`}>Conversation Flow</h3>
           <div className="grid grid-cols-[repeat(auto-fit,minmax(200px,1fr))] gap-4">
             {visualizationData.flowChart.nodes.map((node: any) => (
-              <div 
-                key={node.id} 
-                className={`p-4 rounded-xl shadow-md transition-all duration-300 transform hover:scale-105 ${
-                  darkMode ? 
-                    (node.type === 'start' ? 'bg-emerald-900/40' : 
+              <div
+                key={node.id}
+                className={`p-4 rounded-xl shadow-md transition-all duration-300 transform hover:scale-105 ${darkMode ?
+                  (node.type === 'start' ? 'bg-emerald-900/40' :
                     node.type === 'question' ? 'bg-blue-900/40' : 'bg-purple-900/40') :
-                    (node.type === 'start' ? 'bg-emerald-50' : 
+                  (node.type === 'start' ? 'bg-emerald-50' :
                     node.type === 'question' ? 'bg-blue-50' : 'bg-purple-50')
-                }`}
+                  }`}
               >
                 <div className={`text-base font-medium ${darkMode ? 'text-gray-200' : 'text-gray-800'}`}>{node.label}</div>
               </div>
@@ -472,8 +490,8 @@ export default function ChatInterface() {
           <h3 className={`text-lg font-semibold ${darkMode ? 'text-gray-200' : 'text-gray-800'} mb-4`}>Key Concepts</h3>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {visualizationData.blockDiagram.sections.map((section: any, index: number) => (
-              <div 
-                key={index} 
+              <div
+                key={index}
                 className={`${darkMode ? 'bg-gray-800/60' : 'bg-gray-50'} p-5 rounded-xl shadow-md transition-all duration-300 transform hover:scale-102 hover:shadow-lg backdrop-blur-sm ${animations[animationIndex % animations.length]}`}
               >
                 <h4 className={`font-medium text-xl ${darkMode ? 'text-gray-200' : 'text-gray-800'} mb-3`}>{section.title}</h4>
@@ -495,15 +513,15 @@ export default function ChatInterface() {
           <h3 className={`text-lg font-semibold ${darkMode ? 'text-gray-200' : 'text-gray-800'} mb-4`}>Statistics</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {visualizationData.graphs.map((graph: any, index: number) => (
-              <div 
-                key={index} 
+              <div
+                key={index}
                 className={`${darkMode ? 'bg-gray-800/60' : 'bg-gray-50'} p-5 rounded-xl shadow-md transition-all duration-300`}
               >
                 <h4 className={`font-medium text-lg ${darkMode ? 'text-gray-200' : 'text-gray-800'} mb-4`}>{graph.title}</h4>
                 <div className={`h-48 ${darkMode ? 'bg-gray-900/70' : 'bg-white'} rounded-lg shadow-inner p-4`}>
                   <div className="flex items-end h-full gap-2">
                     {graph.data.values.map((value: number, i: number) => (
-                      <div 
+                      <div
                         key={i}
                         style={{ height: `${value}%` }}
                         className={`flex-1 ${darkMode ? 'bg-blue-500/80' : 'bg-blue-400'} rounded-t-lg transition-all duration-500 transform hover:scale-y-105 relative group`}
@@ -589,7 +607,7 @@ export default function ChatInterface() {
               You'll be redirected to our interactive financial tools in {redirectCountdown} seconds...
             </p>
             <div className="flex justify-center gap-4">
-              <button 
+              <button
                 onClick={() => {
                   window.open('/financial-literacy', '_blank');
                   setShouldRedirect(false);
@@ -598,7 +616,7 @@ export default function ChatInterface() {
               >
                 Go Now
               </button>
-              <button 
+              <button
                 onClick={() => {
                   setShouldRedirect(false);
                   setRedirectCountdown(0);
@@ -613,9 +631,8 @@ export default function ChatInterface() {
       )}
 
       {/* Summary Panel Overlay */}
-      <div className={`fixed inset-0 bg-black bg-opacity-60 backdrop-blur-sm transition-opacity duration-500 z-40 ${
-        isSummaryOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'
-      }`}>
+      <div className={`fixed inset-0 bg-black bg-opacity-60 backdrop-blur-sm transition-opacity duration-500 z-40 ${isSummaryOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'
+        }`}>
         <SummaryPanel />
       </div>
 
@@ -631,14 +648,14 @@ export default function ChatInterface() {
               <h1 className="text-2xl font-bold tracking-tight">Financial Advisor</h1>
             </div>
             <div className="flex items-center gap-4">
-              <button 
+              <button
                 onClick={() => setDarkMode(!darkMode)}
                 className="p-2 rounded-full hover:bg-white/20 transition-colors"
                 title={darkMode ? "Light Mode" : "Dark Mode"}
               >
                 {darkMode ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
               </button>
-              <button 
+              <button
                 onClick={() => {
                   setIsSummaryOpen(true);
                   generateSummary();
@@ -648,7 +665,7 @@ export default function ChatInterface() {
               >
                 <BarChart className="w-5 h-5" />
               </button>
-              <button 
+              <button
                 onClick={() => {
                   setIsVisualizing(!isVisualizing);
                   if (!visualizationData) generateVisualization();
@@ -686,31 +703,31 @@ export default function ChatInterface() {
             {/* Main Content */}
             <div className="flex-1 flex flex-col overflow-hidden">
               {/* Chat Messages */}
-              <div 
+              <div
                 ref={chatContainerRef}
                 className={`flex-1 overflow-y-auto p-5 ${darkMode ? 'bg-gray-800' : 'bg-gray-50'} transition-colors duration-300`}
                 style={{ scrollbarWidth: 'thin', scrollbarColor: darkMode ? '#4B5563 #1F2937' : '#CBD5E0 transparent' }}
               >
                 <div className="max-w-3xl mx-auto space-y-6 pb-4">
                   {messages.map((msg, index) => (
-                    <ChatMessage 
-                      key={index} 
-                      message={msg} 
-                     
+                    <ChatMessage
+                      key={index}
+                      message={msg}
+
                     />
                   ))}
                   <div ref={messagesEndRef} />
                 </div>
               </div>
 
-              
+
               {/* Visualization Panel (if active) */}
               {isVisualizing && visualizationData && (
                 <div className="p-4 bg-white border-t border-gray-200 overflow-y-auto max-h-[40vh]">
                   <div className="max-w-3xl mx-auto">
                     <div className="flex justify-between items-center mb-4">
                       <h3 className="text-lg font-semibold text-gray-800">Financial Insights</h3>
-                      <button 
+                      <button
                         onClick={() => setIsVisualizing(false)}
                         className="p-1 text-gray-500 hover:text-gray-700"
                       >
@@ -724,8 +741,8 @@ export default function ChatInterface() {
 
               {/* Status Bar */}
               <div className={`p-4 border-t ${darkMode ? 'border-gray-700 bg-gray-800' : 'border-gray-200 bg-white'} transition-colors duration-300`}>
-                <div className="max-w-3xl mx-auto flex items-center justify-between">
-                  <div className="flex items-center gap-2 text-sm text-gray-500">
+                <div className="max-w-3xl mx-auto flex flex-col gap-4">
+                  <div className="flex items-center justify-between text-sm text-gray-500">
                     {isProcessing ? (
                       <div className="flex items-center gap-2">
                         <Headphones className={`w-4 h-4 ${darkMode ? 'text-blue-400' : 'text-[hsl(var(--finance-primary))]'} animate-pulse`} />
@@ -743,19 +760,42 @@ export default function ChatInterface() {
                       </div>
                     )}
                   </div>
-                  
-                  <button
-                    onClick={() => isRecording ? null : startRecording()}
-                    disabled={isProcessing || isTTSPlaying}
-                    className={`p-3 rounded-full ${
-                      isRecording 
-                        ? 'bg-red-500 text-white' 
-                        : darkMode ? 'bg-blue-600 text-white' : 'bg-[hsl(var(--finance-primary))] text-white'
-                    } disabled:opacity-50 hover:opacity-90 transition-opacity shadow-md`}
-                    title={isRecording ? 'Recording...' : 'Start Recording'}
-                  >
-                    <Mic className="w-5 h-5" />
-                  </button>
+
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="text"
+                      value={inputText}
+                      onChange={(e) => setInputText(e.target.value)}
+                      onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
+                      placeholder="Type your message..."
+                      disabled={isProcessing}
+                      className={`flex-1 p-3 rounded-xl border ${darkMode
+                        ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400'
+                        : 'bg-white border-gray-300 text-gray-900 placeholder-gray-500'
+                        } focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all`}
+                    />
+
+                    <button
+                      onClick={handleSendMessage}
+                      disabled={!inputText.trim() || isProcessing}
+                      className={`p-3 rounded-full ${darkMode ? 'bg-blue-600 hover:bg-blue-700' : 'bg-[hsl(var(--finance-primary))] hover:opacity-90'
+                        } text-white disabled:opacity-50 transition-all shadow-md`}
+                    >
+                      <Send className="w-5 h-5" />
+                    </button>
+
+                    <button
+                      onClick={() => isRecording ? null : startRecording()}
+                      disabled={isProcessing || isTTSPlaying}
+                      className={`p-3 rounded-full ${isRecording
+                        ? 'bg-red-500 text-white'
+                        : darkMode ? 'bg-gray-700 text-gray-300 hover:bg-gray-600' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                        } disabled:opacity-50 transition-all shadow-md`}
+                      title={isRecording ? 'Recording...' : 'Start Recording'}
+                    >
+                      <Mic className="w-5 h-5" />
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>

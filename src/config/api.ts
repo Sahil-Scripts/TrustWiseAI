@@ -1,3 +1,4 @@
 // API Configuration
-// For the mobile app, we must point to the deployed backend
-export const API_BASE_URL = 'https://trustwise-ai.vercel.app';
+// Empty string for same-origin requests (works for both localhost and production)
+// For the mobile app, change this to the deployed backend URL
+export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || '';
